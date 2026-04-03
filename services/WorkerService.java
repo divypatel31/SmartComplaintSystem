@@ -1,7 +1,5 @@
 package services;
 
-import models.Complaint;
-
 public class WorkerService {
 
     private ComplaintService complaintService;
@@ -10,18 +8,13 @@ public class WorkerService {
         this.complaintService = complaintService;
     }
 
-    public void viewComplaints() {
-        complaintService.viewAllComplaints();
+    public void viewAssignedComplaints(int workerId) {
+        complaintService.viewComplaintsByWorkerId(workerId);
     }
 
     public void resolveComplaint(int complaintId) {
-        Complaint c = complaintService.getComplaintById(complaintId);
-
-        if (c != null) {
-            c.setStatus("RESOLVED");
-            System.out.println("Complaint resolved successfully");
-        } else {
-            System.out.println("Complaint not found");
-        }
+        
+        // Let the ComplaintService handle the DB update
+        complaintService.updateStatus(complaintId, "RESOLVED");
     }
 }
