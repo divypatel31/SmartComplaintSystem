@@ -36,6 +36,6 @@ npm run dev
 The web application will be available at http://localhost:5173.
 
 🛠️ Tech Stack
-**Frontend:** React.js, Tailwind CSS, Framer Motion, Google Maps API
-**Backend:** Java (JDK 17+), JDBC
-**Database:** MySQL
+* **Frontend:** React.js, Tailwind CSS, Framer Motion, Google Maps API
+* **Backend:** Java (JDK 17+), JDBC
+* **Database:** MySQL
