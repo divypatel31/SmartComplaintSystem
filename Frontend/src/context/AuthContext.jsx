@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback } from 'react';
-import { apiLogin, apiRegister } from '../data/mockApi';
+import { apiLogin, apiRegister } from '../data/mockApi'; // ⬅️ UPDATED IMPORT
 
 const AuthContext = createContext(null);
 
@@ -28,8 +28,13 @@ export function AuthProvider({ children }) {
     sessionStorage.removeItem('scs_user');
   }, []);
 
+  const updateLocalUser = (updatedUser) => {
+    setUser(updatedUser);
+    sessionStorage.setItem('scs_user', JSON.stringify(updatedUser));
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, register, logout }}>
+    <AuthContext.Provider value={{ user, login, register, logout, updateLocalUser }}>
       {children}
     </AuthContext.Provider>
   );

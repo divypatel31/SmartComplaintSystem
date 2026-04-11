@@ -10,7 +10,7 @@ public class AuthService {
     public String[] login(String username, String password) {
         String sql = "SELECT id, role FROM users WHERE username = ? AND password = ?";
         try (Connection conn = DBConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            PreparedStatement stmt = conn.prepareStatement(sql)) {
             
             stmt.setString(1, username);
             stmt.setString(2, password); 
