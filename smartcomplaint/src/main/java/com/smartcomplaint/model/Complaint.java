@@ -8,7 +8,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 @Entity
 @Table(name = "complaints")
-@Data // <-- This magically creates all getters and setters for you!
+@Data
 public class Complaint {
     @Id 
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -53,9 +53,4 @@ public class Complaint {
     @Transient
     @JsonProperty("workerMobile")
     private String workerMobile;
-
-    @Column(name = "image_url")
-    private String imageUrl;
-    
-    // Manual getter and setter removed to let Lombok do its job!
 }

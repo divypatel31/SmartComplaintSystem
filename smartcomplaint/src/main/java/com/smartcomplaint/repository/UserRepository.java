@@ -8,12 +8,12 @@ import java.util.Optional;
 // By extending JpaRepository, we get save(), findAll(), deleteById() for free!
 public interface UserRepository extends JpaRepository<User, Integer> {
     
-    // Spring Security uses these to find the user BEFORE verifying the hashed password
-    Optional<User> findByUsername(String username);
+    // Spring Boot reads these method names and automatically generates the SQL!
+    Optional<User> findByUsernameAndPassword(String username, String password);
 
-    Optional<User> findByEmail(String email);
+    Optional<User> findByEmailAndPassword(String email, String password);
     
-    // This keeps your frontend worker assignment logic working perfectly
+    Optional<User> findByUsername(String username);
+    
     List<User> findByRoleAndSpecialtyContaining(String role, String specialty);
-
 }
