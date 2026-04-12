@@ -23,6 +23,14 @@ public class JwtFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) 
             throws ServletException, IOException {
         
+        // 🛡️ THE FAST-PASS LANE: 
+        // Skip the JWT check completely for Preflight (OPTIONS), Login, Register, and WebSockets!
+        String path = request.getRequestURI();
+        if (request.getMethod().equals("OPTIONS") || path.startsWith("/api/auth/") || path.startsWith("/ws/")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         final String authHeader = request.getHeader("Authorization");
 
         if (authHeader != null && authHeader.startsWith("Bearer ")) {

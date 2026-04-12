@@ -21,7 +21,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         // This is the physical tunnel React will connect to
         registry.addEndpoint("/ws")
-                .setAllowedOrigins("http://localhost:5173", "https://smart-complaint-system-phi.vercel.app")
+                .setAllowedOriginPatterns("http://localhost:5173", "https://*.vercel.app")
                 .withSockJS(); // A fallback in case WebSockets fail on older browsers
     }
 }
