@@ -15,6 +15,9 @@ import {
   apiDeleteUser   
 } from '../../data/mockApi';
 
+// 📡 NEW: Import the WebSocket Client
+import { wsClient } from '../../data/websocketClient';
+
 const specialtyFor = cat => ({ PLUMBING: 'PLUMBING', ELECTRICAL: 'ELECTRICAL', IT: 'IT' }[cat] || null);
 const ALL_SPECIALTIES = ['PLUMBING', 'ELECTRICAL', 'IT'];
 
@@ -37,7 +40,8 @@ export default function AdminDashboard() {
   const [userSaving, setUserSaving] = useState(false);
 
   const loadData = async () => {
-    setLoading(true);
+    // Only show the hard loading screen if we have no data at all
+    if (complaints.length === 0) setLoading(true);
     try {
       const [compData, userData] = await Promise.all([
         apiGetAllComplaints(),
@@ -52,7 +56,28 @@ export default function AdminDashboard() {
     }
   };
 
-  useEffect(() => { loadData(); }, []);
+  // 📡 NEW: Connect to WebSockets on mount
+  useEffect(() => {
+    // 1. Initial Standard Fetch
+    loadData();
+
+    // 2. Connect the live tunnel
+    // Admins don't need personal alerts right now, they just need to watch the global grid
+    wsClient.connect(
+      null, 
+      null, // No personal notice callback needed
+      () => {
+        // Callback B: When ANY complaint is created/assigned/resolved, silently fetch fresh data
+        console.log("Live Update Received! Refreshing grid...");
+        loadData(); 
+      }
+    );
+
+    // 3. Cleanup when Admin leaves the page
+    return () => {
+      wsClient.disconnect();
+    };
+  }, []);
 
   // ==========================================
   // COMPLAINT FUNCTIONS
@@ -68,6 +93,8 @@ export default function AdminDashboard() {
     setAssigning(true);
     try {
       await apiAssignComplaint(assignModal.id, workerId);
+      // We don't strictly need loadData() here anymore because the WebSocket will trigger it,
+      // but we keep it to ensure the modal closes immediately.
       await loadData();
       setAssignModal(null);
     } catch (e) { alert("Error: " + e.message); } 
@@ -89,7 +116,7 @@ export default function AdminDashboard() {
     if (!window.confirm("CRITICAL WARNING: Are you sure you want to permanently delete this user and all their data?")) return;
     try {
       await apiDeleteUser(id);
-      await loadData(); // Refresh list automatically
+      await loadData(); 
     } catch (e) { alert("Error terminating user: " + e.message); }
   };
 
@@ -98,7 +125,7 @@ export default function AdminDashboard() {
     try {
       await apiUpdateUser(editUserModal.id, editUserModal);
       setEditUserModal(null);
-      await loadData(); // Refresh list automatically
+      await loadData(); 
     } catch (e) { alert("Error updating user: " + e.message); }
     finally { setUserSaving(false); }
   };
@@ -284,7 +311,6 @@ export default function AdminDashboard() {
                         </div>
                         <div>
                           <p className="text-sm font-bold text-gray-900 group-hover:text-blue-600 transition-colors">{w.username}</p>
-                          {/* Format comma-separated strings nicely (e.g., PLUMBING • IT) */}
                           <p className="text-[10px] font-medium text-gray-400 uppercase tracking-tight">
                             {w.specialty ? w.specialty.split(',').join(' • ') : 'NO SPECIALTY'}
                           </p>

@@ -6,13 +6,15 @@ import ComplaintCard from '../shared/ComplaintCard';
 import StatCard from '../shared/StatCard';
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
 
-// FIXED IMPORT: Using real API file
 import { 
   apiGetMyComplaints, 
   apiSubmitComplaint, 
   apiGetNotices, 
   apiDeleteNotice 
 } from '../../data/mockApi'; 
+
+// 📡 NEW: Import the WebSocket Client
+import { wsClient } from '../../data/websocketClient';
 
 const CATEGORIES = [
   { id: 'PLUMBING',   icon: '🔧', label: 'Plumbing'   },
@@ -21,37 +23,33 @@ const CATEGORIES = [
   { id: 'GENERAL',    icon: '📋', label: 'General'     },
 ];
 
-// Map Settings
 const mapContainerStyle = { width: '100%', height: '200px', borderRadius: '12px' };
 const defaultCenter = { lat: 20.5937, lng: 78.9629 }; 
 
 export default function UserDashboard() {
   const { user } = useAuth();
   
-  // ── View State ──
-  const [view, setView] = useState('overview'); // 'overview' or 'notices'
+  const [view, setView] = useState('overview'); 
   
-  // ── Data States ──
   const [complaints, setComplaints] = useState([]);
   const [notices, setNotices] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // ── UI States ──
-  const [modal, setModal] = useState(false); // Triggers Slide Panel
+  const [modal, setModal] = useState(false); 
   const [filter, setFilter] = useState('ALL');
   
-  // ── Form & Location State ──
   const [form, setForm] = useState({ 
     description: '', 
     category: 'GENERAL',
     location: user?.location || '' 
   });
+  const [imageFile, setImageFile] = useState(null);
+
   const [submitting, setSubmitting] = useState(false);
   const [locMode, setLocMode] = useState('manual');
   const [detectingLoc, setDetectingLoc] = useState(false);
   const [mapCenter, setMapCenter] = useState(defaultCenter);
 
-  // 1. Load Google Maps API Securely
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
@@ -60,7 +58,6 @@ export default function UserDashboard() {
   const loadData = async () => {
     setLoading(true);
     try {
-      // Fetch Complaints and Notices simultaneously
       const [compData, noticeData] = await Promise.all([
         apiGetMyComplaints(user.id),
         apiGetNotices(user.id)
@@ -74,9 +71,33 @@ export default function UserDashboard() {
     }
   };
 
-  useEffect(() => { loadData(); }, []);
+  // 📡 NEW: Connect to WebSockets on mount
+  useEffect(() => {
+    // 1. Initial standard fetch
+    loadData();
 
-  // ── Map Location Helpers ──
+    // 2. Connect the live tunnel
+    if (user?.id) {
+      wsClient.connect(
+        user.id,
+        // When a new notice arrives (like a worker being assigned)
+        (newNotice) => {
+          setNotices((prev) => [newNotice, ...prev]);
+          alert(`🔔 Live Alert: ${newNotice.title}`);
+        },
+        // When the global complaints change (we fetch the latest silent update)
+        () => {
+          loadData();
+        }
+      );
+    }
+
+    // 3. Cleanup: Stop listening when we leave the dashboard
+    return () => {
+      wsClient.disconnect();
+    };
+  }, [user]);
+
   const fetchAddress = async (lat, lng) => {
     try {
       const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`);
@@ -118,15 +139,15 @@ export default function UserDashboard() {
     fetchAddress(lat, lng);
   }, []);
 
-  // ── Actions ──
   const handleSubmit = async () => {
     if (!form.description.trim() || !form.location.trim()) return alert("Please fill in all details.");
     setSubmitting(true);
     try {
-      await apiSubmitComplaint({ ...form, userId: user.id });
-      await loadData();
+      await apiSubmitComplaint({ ...form, userId: user.id }, imageFile);
+      // Removed loadData() here because the WebSocket will tell us when it's done!
       setModal(false);
       setForm({ description: '', category: 'GENERAL', location: user?.location || '' });
+      setImageFile(null); 
     } catch (err) {
       alert(err.message);
     } finally {
@@ -156,10 +177,8 @@ export default function UserDashboard() {
     >
       <div className="max-w-6xl mx-auto space-y-8">
         
-        {/* ── VIEW 1: OVERVIEW (COMPLAINTS) ── */}
         {view === 'overview' && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
-            {/* SaaS Hero Welcome */}
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="relative overflow-hidden rounded-[2rem] bg-black p-10 text-white">
               <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/20 blur-[80px] -mr-20 -mt-20" />
               <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -180,14 +199,12 @@ export default function UserDashboard() {
               </div>
             </motion.div>
 
-            {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <StatCard label="Active Requests" value={complaints.filter(c => c.status !== 'RESOLVED').length} color="blue" />
               <StatCard label="Resolved" value={complaints.filter(c => c.status === 'RESOLVED').length} color="emerald" />
               <StatCard label="Avg Response" value="Under 2h" color="gray" />
             </div>
 
-            {/* Filter Bar */}
             <div className="flex items-center justify-between border-b border-gray-100 pb-4">
               <div className="flex gap-6">
                 {['ALL', 'PENDING', 'ASSIGNED', 'RESOLVED'].map(f => (
@@ -205,7 +222,6 @@ export default function UserDashboard() {
               </div>
             </div>
 
-            {/* Dynamic Complaint List */}
             {loading ? (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {[1, 2].map(i => <div key={i} className="h-44 rounded-3xl bg-gray-100 animate-pulse" />)}
@@ -231,7 +247,6 @@ export default function UserDashboard() {
           </motion.div>
         )}
 
-        {/* ── VIEW 2: NOTICE CENTER ── */}
         {view === 'notices' && (
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-6">
             <div className="flex items-center justify-between border-b border-gray-100 pb-4">
@@ -294,12 +309,10 @@ export default function UserDashboard() {
         )}
       </div>
 
-      {/* ── NEW SLIDE-OVER PANEL (DRAWER) ── */}
       <AnimatePresence>
         {modal && (
           <div className="fixed inset-0 z-[100] flex justify-end">
             
-            {/* Dark Blurred Backdrop */}
             <motion.div 
               initial={{ opacity: 0 }} 
               animate={{ opacity: 1 }} 
@@ -308,7 +321,6 @@ export default function UserDashboard() {
               className="absolute inset-0 bg-black/30 backdrop-blur-sm" 
             />
             
-            {/* Sliding White Panel */}
             <motion.div 
               initial={{ x: '100%', opacity: 0.5 }} 
               animate={{ x: 0, opacity: 1 }} 
@@ -317,7 +329,6 @@ export default function UserDashboard() {
               className="relative w-full max-w-lg h-screen bg-white shadow-2xl flex flex-col"
             >
               
-              {/* Panel Header */}
               <div className="flex items-center justify-between px-8 py-6 border-b border-gray-100 bg-white sticky top-0 z-10">
                 <div>
                   <h3 className="text-2xl font-black text-gray-900 tracking-tight">New Request</h3>
@@ -331,10 +342,8 @@ export default function UserDashboard() {
                 </button>
               </div>
 
-              {/* Panel Scrollable Body */}
               <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
                 
-                {/* Category Selection */}
                 <div className="space-y-4">
                   <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest ml-1">Issue Category</label>
                   <div className="grid grid-cols-2 gap-3">
@@ -353,7 +362,6 @@ export default function UserDashboard() {
                   </div>
                 </div>
 
-                {/* Map Location Selector */}
                 <div className="space-y-4">
                   <div className="flex items-center justify-between px-1">
                     <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Incident Location</label>
@@ -401,7 +409,16 @@ export default function UserDashboard() {
                   )}
                 </div>
 
-                {/* Description Field */}
+                <div className="space-y-4">
+                  <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest ml-1">Attach Evidence (Photo)</label>
+                  <input 
+                    type="file" 
+                    accept="image/*"
+                    onChange={(e) => setImageFile(e.target.files[0])}
+                    className="w-full px-5 py-3 rounded-xl bg-gray-50 border border-gray-100 focus:bg-white focus:border-black outline-none transition-all text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-black file:text-white hover:file:bg-gray-800"
+                  />
+                </div>
+
                 <div className="space-y-4">
                   <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest ml-1">Detailed Description</label>
                   <textarea 
@@ -413,7 +430,6 @@ export default function UserDashboard() {
                 </div>
               </div>
 
-              {/* Panel Footer (Sticky Submit Button) */}
               <div className="p-6 border-t border-gray-100 bg-white sticky bottom-0 z-10">
                 <motion.button 
                   whileTap={{ scale: 0.95 }}

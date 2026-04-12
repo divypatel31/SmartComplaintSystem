@@ -1,5 +1,3 @@
-// src/data/api.js
-
 const BASE_URL = "https://smartcomplaintsystem-qfgg.onrender.com/api";
 
 // ==========================================
@@ -15,7 +13,9 @@ export const apiLogin = async (credentials) => {
     const text = await res.text();
     throw new Error(text || 'Login failed.');
   }
-  return res.json();
+  const data = await res.json();
+  sessionStorage.setItem('jwt_token', data.token);
+  return data;
 };
 
 export const apiRegister = async (data) => {
@@ -28,35 +28,57 @@ export const apiRegister = async (data) => {
     const text = await res.text();
     throw new Error(text || 'Registration failed.');
   }
-  return res.json();
+  const dataRes = await res.json();
+  sessionStorage.setItem('jwt_token', dataRes.token);
+  return dataRes;
 };
 
 // ==========================================
 // COMPLAINTS (TICKETS)
 // ==========================================
 export const apiGetAllComplaints = async () => {
-  const res = await fetch(`${BASE_URL}/complaints`);
+  const res = await fetch(`${BASE_URL}/complaints`, {
+    headers: { 'Authorization': `Bearer ${sessionStorage.getItem('jwt_token')}` }
+  });
   if (!res.ok) throw new Error('Failed to fetch complaints');
   return res.json();
 };
 
 export const apiGetMyComplaints = async (userId) => {
-  const res = await fetch(`${BASE_URL}/complaints?userId=${userId}`);
+  const res = await fetch(`${BASE_URL}/complaints?userId=${userId}`, {
+    headers: { 'Authorization': `Bearer ${sessionStorage.getItem('jwt_token')}` }
+  });
   if (!res.ok) throw new Error('Failed to fetch your complaints');
   return res.json();
 };
 
 export const apiGetWorkerComplaints = async (workerId) => {
-  const res = await fetch(`${BASE_URL}/complaints?workerId=${workerId}`);
+  const res = await fetch(`${BASE_URL}/complaints?workerId=${workerId}`, {
+    headers: { 'Authorization': `Bearer ${sessionStorage.getItem('jwt_token')}` }
+  });
   if (!res.ok) throw new Error('Failed to fetch assigned tasks');
   return res.json();
 };
 
-export const apiSubmitComplaint = async (data) => {
+// UPDATED: Now accepts imageFile and uses FormData
+export const apiSubmitComplaint = async (complaintData, imageFile) => {
+  const formData = new FormData();
+  
+  // Attach text data as a JSON string
+  formData.append("complaint", JSON.stringify(complaintData));
+
+  // Attach the image file if one was provided
+  if (imageFile) {
+    formData.append("image", imageFile);
+  }
+
   const res = await fetch(`${BASE_URL}/complaints`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
+    headers: { 
+      // CRITICAL: Do NOT set Content-Type here. The browser must set it automatically for FormData.
+      'Authorization': `Bearer ${sessionStorage.getItem('jwt_token')}`
+    },
+    body: formData,
   });
   if (!res.ok) throw new Error('Failed to submit complaint');
   return res.json();
@@ -65,6 +87,7 @@ export const apiSubmitComplaint = async (data) => {
 export const apiAssignComplaint = async (complaintId, workerId) => {
   const res = await fetch(`${BASE_URL}/complaints/${complaintId}/assign/${workerId}`, {
     method: 'PUT',
+    headers: { 'Authorization': `Bearer ${sessionStorage.getItem('jwt_token')}` }
   });
   if (!res.ok) throw new Error('Failed to assign complaint');
   return res.json();
@@ -73,6 +96,7 @@ export const apiAssignComplaint = async (complaintId, workerId) => {
 export const apiResolveComplaint = async (complaintId) => {
   const res = await fetch(`${BASE_URL}/complaints/${complaintId}/resolve`, {
     method: 'PUT',
+    headers: { 'Authorization': `Bearer ${sessionStorage.getItem('jwt_token')}` }
   });
   if (!res.ok) throw new Error('Failed to resolve complaint');
   return res.json();
@@ -80,7 +104,8 @@ export const apiResolveComplaint = async (complaintId) => {
 
 export const apiDeleteComplaint = async (id) => {
   const res = await fetch(`${BASE_URL}/complaints/${id}`, {
-    method: 'DELETE'
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${sessionStorage.getItem('jwt_token')}` }
   });
   if (!res.ok) throw new Error("Failed to delete complaint");
   return true;
@@ -90,13 +115,17 @@ export const apiDeleteComplaint = async (id) => {
 // USERS & WORKERS
 // ==========================================
 export const apiGetAllUsers = async () => {
-  const res = await fetch(`${BASE_URL}/users`);
+  const res = await fetch(`${BASE_URL}/users`, {
+    headers: { 'Authorization': `Bearer ${sessionStorage.getItem('jwt_token')}` }
+  });
   if (!res.ok) throw new Error("Failed to fetch users");
   return res.json();
 };
 
 export const apiGetWorkersBySpecialty = async (specialty) => {
-  const res = await fetch(`${BASE_URL}/complaints/workers/${specialty}`);
+  const res = await fetch(`${BASE_URL}/complaints/workers/${specialty}`, {
+    headers: { 'Authorization': `Bearer ${sessionStorage.getItem('jwt_token')}` }
+  });
   if (!res.ok) throw new Error('Failed to fetch workers');
   return res.json();
 };
@@ -104,7 +133,10 @@ export const apiGetWorkersBySpecialty = async (specialty) => {
 export const apiUpdateUser = async (userId, data) => {
   const res = await fetch(`${BASE_URL}/users/${userId}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${sessionStorage.getItem('jwt_token')}`
+    },
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error('Failed to update profile');
@@ -113,7 +145,8 @@ export const apiUpdateUser = async (userId, data) => {
 
 export const apiDeleteUser = async (id) => {
   const res = await fetch(`${BASE_URL}/users/${id}`, { 
-    method: 'DELETE' 
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${sessionStorage.getItem('jwt_token')}` }
   });
   if (!res.ok) throw new Error("Failed to delete user");
   return true;
@@ -123,13 +156,18 @@ export const apiDeleteUser = async (id) => {
 // NOTIFICATIONS
 // ==========================================
 export const apiGetNotices = async (userId) => {
-  const res = await fetch(`${BASE_URL}/notifications/${userId}`);
+  const res = await fetch(`${BASE_URL}/notifications/${userId}`, {
+    headers: { 'Authorization': `Bearer ${sessionStorage.getItem('jwt_token')}` }
+  });
   if (!res.ok) throw new Error("Failed to fetch notices");
   return res.json();
 };
 
 export const apiDeleteNotice = async (id) => {
-  const res = await fetch(`${BASE_URL}/notifications/${id}`, { method: 'DELETE' });
+  const res = await fetch(`${BASE_URL}/notifications/${id}`, { 
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${sessionStorage.getItem('jwt_token')}` }
+  });
   if (!res.ok) throw new Error("Failed to delete notice");
   return true;
 };
