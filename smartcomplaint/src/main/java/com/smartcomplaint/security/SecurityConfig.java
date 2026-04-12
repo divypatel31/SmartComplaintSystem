@@ -3,6 +3,7 @@ package com.smartcomplaint.security;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -11,8 +12,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.CorsFilter;
 
 import java.util.Arrays;
 
@@ -27,12 +28,15 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .csrf(csrf -> csrf.disable())
-            .cors(cors -> cors.configurationSource(corsConfigurationSource())) 
-            // Tell Spring Security not to use session cookies (since we use JWT tokens)
+            // Enable the custom CorsFilter defined below
+            .cors(cors -> cors.configure(http)) 
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
+                // 🛡️ CRITICAL FIX: Always allow the browser's "Preflight" ping to pass through!
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                
                 .requestMatchers("/api/auth/**").permitAll() // Unlocks Login/Register
-                .requestMatchers("/ws/**").permitAll()       // Unlocks Live WebSockets
+                .requestMatchers("/ws/**").permitAll()       // Unlocks WebSockets
                 .anyRequest().authenticated() 
             )
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
@@ -45,23 +49,24 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
-    // This is the absolute source of truth for CORS when using Spring Security
+    // 🛡️ CRITICAL FIX: Defining this as a global CorsFilter Bean ensures it runs before ANY security checks
     @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration();
+    public CorsFilter corsFilter() {
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        CorsConfiguration config = new CorsConfiguration();
         
-        // 🚀 THE FIX: Use setAllowedOriginPatterns when using wildcards (*)
-        configuration.setAllowedOriginPatterns(Arrays.asList(
+        config.setAllowCredentials(true);
+        
+        // Exact URLs to ensure no wildcard matching errors
+        config.setAllowedOrigins(Arrays.asList(
             "http://localhost:5173", 
-            "https://*.vercel.app"
+            "https://smart-complaint-system-phi.vercel.app"
         ));
         
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Accept"));
-        configuration.setAllowCredentials(true);
+        config.setAllowedHeaders(Arrays.asList("Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With"));
+        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
-        return source;
+        source.registerCorsConfiguration("/**", config);
+        return new CorsFilter(source);
     }
 }
