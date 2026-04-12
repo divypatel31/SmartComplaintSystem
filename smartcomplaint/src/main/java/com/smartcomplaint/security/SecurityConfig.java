@@ -5,6 +5,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -26,10 +27,12 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .csrf(csrf -> csrf.disable())
-            // Tell Spring Security to use the CORS settings defined below
             .cors(cors -> cors.configurationSource(corsConfigurationSource())) 
+            // Tell Spring Security not to use session cookies (since we use JWT tokens)
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**").permitAll() 
+                .requestMatchers("/api/auth/**").permitAll() // Unlocks Login/Register
+                .requestMatchers("/ws/**").permitAll()       // Unlocks Live WebSockets
                 .anyRequest().authenticated() 
             )
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
@@ -46,11 +49,13 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // Add your Vercel and Localhost URLs here
-        configuration.setAllowedOrigins(Arrays.asList(
+        
+        // 🚀 THE FIX: Use setAllowedOriginPatterns when using wildcards (*)
+        configuration.setAllowedOriginPatterns(Arrays.asList(
             "http://localhost:5173", 
             "https://*.vercel.app"
         ));
+        
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Accept"));
         configuration.setAllowCredentials(true);
