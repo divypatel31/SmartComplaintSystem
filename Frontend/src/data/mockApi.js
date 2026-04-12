@@ -9,28 +9,54 @@ export const apiLogin = async (credentials) => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(credentials),
   });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text || 'Login failed.');
+
+  // 🛡️ BULLETPROOF PARSING: Check if backend sent text or JSON
+  const contentType = res.headers.get("content-type");
+  let data;
+  if (contentType && contentType.includes("application/json")) {
+    data = await res.json();
+  } else {
+    data = await res.text();
   }
-  const data = await res.json();
-  sessionStorage.setItem('jwt_token', data.token);
+
+  // If status is 400, 401, 500, etc. Throw the error neatly!
+  if (!res.ok) {
+    throw new Error(typeof data === 'string' ? data : data.message || 'Login failed.');
+  }
+
+  // Only set token if it exists
+  if (data && data.token) {
+    sessionStorage.setItem('jwt_token', data.token);
+  }
   return data;
 };
 
-export const apiRegister = async (data) => {
+export const apiRegister = async (dataPayload) => {
   const res = await fetch(`${BASE_URL}/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
+    body: JSON.stringify(dataPayload),
   });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text || 'Registration failed.');
+
+  // 🛡️ BULLETPROOF PARSING: Check if backend sent text or JSON
+  const contentType = res.headers.get("content-type");
+  let data;
+  if (contentType && contentType.includes("application/json")) {
+    data = await res.json();
+  } else {
+    data = await res.text();
   }
-  const dataRes = await res.json();
-  sessionStorage.setItem('jwt_token', dataRes.token);
-  return dataRes;
+
+  // If registration fails, throw a clean error
+  if (!res.ok) {
+    throw new Error(typeof data === 'string' ? data : data.message || 'Registration failed.');
+  }
+
+  // Only set token if it exists
+  if (data && data.token) {
+    sessionStorage.setItem('jwt_token', data.token);
+  }
+  return data;
 };
 
 // ==========================================
