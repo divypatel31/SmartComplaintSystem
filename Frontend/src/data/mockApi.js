@@ -1,6 +1,6 @@
 // src/data/api.js
 
-const BASE_URL = "https://smartcomplaintsystem-qfgg.onrender.com/api  ";
+const BASE_URL = "https://smartcomplaintsystem-qfgg.onrender.com/api";
 
 // ==========================================
 // AUTHENTICATION
