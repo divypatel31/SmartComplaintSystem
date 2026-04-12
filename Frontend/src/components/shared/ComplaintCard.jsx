@@ -26,6 +26,7 @@ export default function ComplaintCard({ complaint, actions }) {
   const style = statusColors[complaint.status] || statusColors.PENDING;
 
   // ── SMART DATA PARSING ──
+  // This checks if the backend sent the full user object, or just the ID.
   const reporterName  = complaint.user?.username || complaint.username || `User #${complaint.userId}`;
   const reporterPhone = complaint.user?.mobileNumber || complaint.userMobile || 'No number provided';
   const reporterLoc   = complaint.user?.location || complaint.userLocation || 'No location provided';
@@ -108,20 +109,6 @@ export default function ComplaintCard({ complaint, actions }) {
               className="overflow-hidden border-t border-gray-100/80 pt-6"
               onClick={(e) => e.stopPropagation()} 
             >
-              {/* 📸 NEW: Image Display Block */}
-              {complaint.imageUrl && (
-                <div className="mb-6">
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3">Attached Evidence</p>
-                  <motion.img 
-                    initial={{ scale: 0.9, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    src={complaint.imageUrl} 
-                    alt="Evidence" 
-                    className="w-full max-h-[300px] object-cover rounded-[1.5rem] border border-gray-100 shadow-md hover:shadow-lg transition-shadow"
-                  />
-                </div>
-              )}
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 
                 {/* User Details Box */}
