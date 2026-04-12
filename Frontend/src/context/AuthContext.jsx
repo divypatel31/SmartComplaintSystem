@@ -9,11 +9,14 @@ export function AuthProvider({ children }) {
     catch { return null; }
   });
 
+  // src/context/AuthContext.jsx
   const login = useCallback(async (credentials) => {
-    const u = await apiLogin(credentials);
-    setUser(u);
-    sessionStorage.setItem('scs_user', JSON.stringify(u));
-    return u;
+    const data = await apiLogin(credentials);
+    const userProfile = data.user; 
+    
+    setUser(userProfile);
+    sessionStorage.setItem('scs_user', JSON.stringify(userProfile));
+    return userProfile;
   }, []);
 
   const register = useCallback(async (data) => {

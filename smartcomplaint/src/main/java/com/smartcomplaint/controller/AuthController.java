@@ -15,7 +15,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
-// Note: I removed @CrossOrigin here because your new CorsConfig.java handles it globally for both localhost AND Vercel!
 public class AuthController {
 
     @Autowired
@@ -29,65 +28,71 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody AuthRequest req) {
-        // 1. Try to find the user by Username first
-        User user = userRepository.findByUsername(req.getUsername()).orElse(null);
+        System.out.println("Login attempt for: " + req.getUsername());
 
-        // 2. If that fails, try to find by Email (using the same input field)
-        if (user == null) {
-            user = userRepository.findByEmail(req.getUsername()).orElse(null);
-        }
+        // 1. Try to find the user by Username or Email
+        User user = userRepository.findByUsername(req.getUsername())
+                .orElseGet(() -> userRepository.findByEmail(req.getUsername()).orElse(null));
 
-        // 3. Security Check: Verify user exists AND hashed password matches
+        // 2. Verify user exists AND hashed password matches
         if (user == null || !passwordEncoder.matches(req.getPassword(), user.getPassword())) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid Email/Username or Password");
         }
 
-        // 4. Generate JWT Token
+        // 3. Generate JWT Token
         String token = jwtUtil.generateToken(user.getUsername());
 
-        // 5. Return token and user data to React
+        // 4. SECURITY: Clear password from user object before sending to React
+        user.setPassword(null);
+
         Map<String, Object> response = new HashMap<>();
         response.put("token", token);
         response.put("user", user);
 
+        System.out.println("Login successful for: " + user.getUsername());
         return ResponseEntity.ok(response);
     }
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody AuthRequest req) {
+        System.out.println("Registration attempt for: " + req.getUsername());
+
+        // 1. CHECK IF USERNAME TAKEN: Prevents "White Screen" DB errors
+        if (userRepository.findByUsername(req.getUsername()).isPresent()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Username is already taken.");
+        }
+
+        // 2. CHECK IF EMAIL TAKEN
+        if (userRepository.findByEmail(req.getEmail()).isPresent()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Email is already registered.");
+        }
+
+        // 3. Create and Save User
         User user = new User();
         user.setEmail(req.getEmail());
         user.setUsername(req.getUsername());
+        user.setPassword(passwordEncoder.encode(req.getPassword())); // Securely hash
         
-        // SECURITY UPGRADE: Hash the password before saving!
-        user.setPassword(passwordEncoder.encode(req.getPassword()));
-        
+        // Default to USER role for safety. Only an Admin should promote others.
         user.setRole(req.getRole() != null ? req.getRole().toUpperCase() : "USER");
+        
         user.setSpecialty(req.getSpecialty());
         user.setLocation(req.getLocation());
         user.setMobileNumber(req.getMobileNumber());
         
         User savedUser = userRepository.save(user);
 
-        // Give them a token immediately so they log in automatically
+        // 4. Generate Token for immediate login
         String token = jwtUtil.generateToken(savedUser.getUsername());
+
+        // 5. SECURITY: Clear password hash
+        savedUser.setPassword(null);
 
         Map<String, Object> response = new HashMap<>();
         response.put("token", token);
         response.put("user", savedUser);
 
+        System.out.println("Registration successful for: " + savedUser.getUsername());
         return ResponseEntity.ok(response);
-    }
-
-    @PutMapping("/users/{id}")
-    public ResponseEntity<?> updateUser(@PathVariable Integer id, @RequestBody User updates) {
-        User user = userRepository.findById(id).orElseThrow(() -> new RuntimeException("User not found"));
-
-        if (updates.getLocation() != null)
-            user.setLocation(updates.getLocation());
-        if (updates.getMobileNumber() != null)
-            user.setMobileNumber(updates.getMobileNumber());
-
-        return ResponseEntity.ok(userRepository.save(user));
     }
 }
