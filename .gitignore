@@ -4,3 +4,7 @@ dist/
 db.properties
 *.log
 *.class
+
+# Frontend secrets
+Frontend/.env
+Frontend/.env.local
